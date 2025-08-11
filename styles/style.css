@@ -1,37 +1,46 @@
+
+:root {
+  --pink: pink;
+  --blue: rgb(88, 99, 255);
+  --dark-pink: rgb(119, 0, 99);
+}
+
 body {
   background-color: rgb(19, 20, 24);
 }
 
-/* paragraphs */
-#one {
-  color: pink;
-}
-#two {
-  color: rgb(88, 99, 255);
-}
-
-/* links */
-  a:link {
-  color: pink;
+a {
+  color: var(--pink);
   background-color: transparent;
   text-decoration: none;
- }
-  a:visited {
- color: pink;
-  background-color: transparent;
-  text-decoration: none;
-  }
+}
   
-   a:hover {
-  color: rgb(119, 0, 99);
-  background-color: transparent;
+a:hover {
+  color: var(--dark-pink);
   text-decoration: underline;
-   }
+}
   
-   a:active {
- color: pink;
- background-color: transparent;
- text-decoration: underline;
-   }
+a:active {
+  text-decoration: underline;
+}
 
+.text-pink {
+  color: var(--pink)
+}
+
+.text-blue {
+  color: var(--blue);
+}
+
+.transperent-background {
+  background-color: transparent;
+}
+
+.no-text-deco {
+  text-decoration: none;
+}
+
+.text-underline {
+  text-decoration: underline;
+}
 
