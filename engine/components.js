@@ -1,14 +1,19 @@
-const componentsToRegister = ['button', 'navbar', 'blabla'];
+const componentsToRegister = ['button', 'navbar'];
 
 class CustomComponent extends HTMLElement {
     constructor() {
         super();
-        this.attachShadow({ mode: 'open' });
     }
 
     async connectedCallback() {
         const name = this.tagName.toLowerCase().replace('custom-', ''); 
         const componentPath = `/components/${name}`;
+
+        const storedChildren = document.createDocumentFragment();
+        
+        while (this.firstChild) {
+            storedChildren.appendChild(this.firstChild);
+        }
 
         try {
             const htmlResponse = await fetch(`${componentPath}/component.html`);
@@ -20,31 +25,38 @@ class CustomComponent extends HTMLElement {
                 cssText = await cssResponse.text();
             } catch (error) { /* CSS is optional */ }
 
-            this.shadowRoot.innerHTML = `
+            // Create a wrapper div to hold the fetched content
+            const wrapper = document.createElement('div');
+            wrapper.innerHTML = `
                 <style>${cssText}</style>
                 ${htmlText}
-                <slot></slot>
             `;
 
-            document.querySelectorAll('link[rel="stylesheet"], style').forEach(el => {
-                this.shadowRoot.appendChild(el.cloneNode(true));
-            });
+            // Append the wrapper's children to the component without overwriting existing content
+            while (wrapper.firstChild) {
+                this.appendChild(wrapper.firstChild);
+            }
 
-            this.element = this.shadowRoot.children[1] // First child after <style> is the root element
+            // document.querySelectorAll('link[rel="stylesheet"], style').forEach(el => {
+            const slot = this.querySelector('slot');
+            if (slot) {
+                slot.parentElement.appendChild(storedChildren);
+                slot.remove();
+            }
+
+            this.element = this.children[1] // First child after <style> is the root element
 
             Array.from(this.attributes).forEach(attribute => {
-                this.shadowRoot.querySelectorAll(`data-${attribute.name}`).forEach(element => {
+                this.querySelectorAll(`data-${attribute.name}`).forEach(element => {
                     element.textContent = attribute.value;
                 });
             });
 
             try {
-                
                 const jsText = await (await fetch(`${componentPath}/component.js`)).text();
                 const fn = new Function('component', jsText);
                 fn(this);
             } catch (error) { /* JS is optional */ }
-
         } catch (error) {
             console.error(`Error loading component ${name}:`, error);
         }
