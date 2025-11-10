@@ -1,77 +1,122 @@
+/** @type {string[]} List of components to auto-register */
 const componentsToRegister = ['button', 'navbar'];
 
+/**
+ * Base class for custom web components
+ * @extends HTMLElement
+ */
 class CustomComponent extends HTMLElement {
+    /** @type {Element} Root element of the component */
+    element;
+    
     constructor() {
         super();
     }
 
-    async connectedCallback() {
-        const name = this.tagName.toLowerCase().replace('custom-', ''); 
-        const componentPath = `/components/${name}`;
-
-        const storedChildren = document.createDocumentFragment();
+    /**
+     * Fetch and parse component resources
+     * @param {string} path - Base path to component files
+     * @returns {Promise<{html: string, css: string, js: Function}>}
+     */
+    async loadComponentResources(path) {
+        const html = await fetch(`${path}/component.html`).then(r => r.text());
         
+        const css = await fetch(`${path}/component.css`)
+            .then(response => response.text())
+            .catch(() => ''); // CSS is optional
+
+        const js = await fetch(`${path}/component.js`)
+            .then(async response => {
+                const code = await response.text();
+                return new Function('component', code);
+            })
+            .catch(() => ''); // JS is optional
+
+        return { html, css, js };
+    }
+
+    /**
+     * Store and handle child elements for slot support
+     * @returns {DocumentFragment}
+     */
+    storeExistingChildren() {
+        const fragment = document.createDocumentFragment();
         while (this.firstChild) {
-            storedChildren.appendChild(this.firstChild);
+            fragment.appendChild(this.firstChild);
         }
+        return fragment;
+    }
 
+    /**
+     * Apply component attributes to matching elements
+     */
+    applyAttributes() {
+        Array.from(this.attributes).forEach(attribute => {
+            this.querySelectorAll(`[data-${attribute.name}]`).forEach(element => {
+                element.textContent = attribute.value;
+            });
+        });
+    }
+
+    /**
+     * Lifecycle callback when component is added to DOM
+     */
+    async connectedCallback() {
         try {
-            const htmlResponse = await fetch(`${componentPath}/component.html`);
-            const htmlText = await htmlResponse.text();
+            const name = this.tagName.toLowerCase().replace('custom-', '');
+            const componentPath = `/components/${name}`;
+            
+            // Store existing children for slot support
+            const storedChildren = this.storeExistingChildren();
 
-            let cssText = '';
-            try {
-                const cssResponse = await fetch(`${componentPath}/component.css`);
-                cssText = await cssResponse.text();
-            } catch (error) { /* CSS is optional */ }
+            // Load component resources
+            const { html, css, js } = await this.loadComponentResources(componentPath);
 
-            // Create a wrapper div to hold the fetched content
+            // Create and populate component wrapper
             const wrapper = document.createElement('div');
             wrapper.innerHTML = `
-                <style>${cssText}</style>
-                ${htmlText}
+                <style>${css}</style>
+                ${html}
             `;
 
-            // Append the wrapper's children to the component without overwriting existing content
+            // Transfer wrapper contents to component
             while (wrapper.firstChild) {
                 this.appendChild(wrapper.firstChild);
             }
 
-            // document.querySelectorAll('link[rel="stylesheet"], style').forEach(el => {
+            // Handle slots if present
             const slot = this.querySelector('slot');
             if (slot) {
-                slot.parentElement.appendChild(storedChildren);
-                slot.remove();
+                slot.appendChild(storedChildren);
             }
 
-            this.element = this.children[1] // First child after <style> is the root element
+            // Store reference to root element (after style)
+            this.element = this.children[1];
 
-            Array.from(this.attributes).forEach(attribute => {
-                this.querySelectorAll(`data-${attribute.name}`).forEach(element => {
-                    element.textContent = attribute.value;
-                });
-            });
+            // Apply attributes to matching elements
+            this.applyAttributes();
 
-            try {
-                const jsText = await (await fetch(`${componentPath}/component.js`)).text();
-                const fn = new Function('component', jsText);
-                fn(this);
-            } catch (error) { /* JS is optional */ }
+            // Execute component's JavaScript if present
+            if (js) {
+                js(this);
+            }
         } catch (error) {
-            console.error(`Error loading component ${name}:`, error);
+            console.error(`Error initializing component ${this.tagName}:`, error);
         }
     }
 }
 
-componentsToRegister.forEach(name => {
-  const tag = `custom-${name}`;
-  if (customElements.get(tag)) {
-    console.warn(`[cc] ${tag} already defined — skipping`);
-    return;
-  }
-  // Create a unique constructor per tag by subclassing the base
-  customElements.define(tag, class extends CustomComponent {});
-  console.log(`[cc] defined ${tag}`);
-});
+// Register components
+for (const name of componentsToRegister) {
+    const tag = `custom-${name}`;
+    
+    if (customElements.get(tag)) {
+        console.warn(`[Component] ${tag} already registered - skipping`);
+        continue;
+    }
+    
+    customElements.define(tag, class extends CustomComponent {});
+    console.log(`[Component] Registered ${tag}`);
+}
 
 
